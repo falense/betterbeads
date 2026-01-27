@@ -199,8 +199,9 @@ def main():
             lines.extend(get_installation_instructions())
         lines.extend([
             "### Issue Requirement",
-            "**All changes must have an accompanying GitHub issue.**",
-            "Before starting any work, create an issue with `bb create` to track it.",
+            "**All work must have an accompanying GitHub issue.**",
+            "This includes code changes, git operations, configuration, refactoring - everything.",
+            "Before starting ANY work, create an issue with `bb create` to track it.",
         ])
         print("\n".join(lines))
         sys.exit(0)
@@ -217,8 +218,9 @@ def main():
         lines.extend(get_installation_instructions())
 
     lines.append("### Issue Requirement")
-    lines.append("**All changes must have an accompanying GitHub issue.**")
-    lines.append("- Before starting work, identify or create the relevant issue")
+    lines.append("**All work must have an accompanying GitHub issue.**")
+    lines.append("This includes code changes, git operations, configuration, refactoring - everything.")
+    lines.append("- Before starting ANY work, identify or create the relevant issue")
     lines.append("- If no issue exists for the requested work, create one with `bb create`")
     lines.append("- Reference the issue number in commits")
     lines.append("")
