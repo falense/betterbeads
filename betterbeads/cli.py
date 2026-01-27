@@ -1668,5 +1668,202 @@ def pr_create_cmd(
         sys.exit(e.returncode)
 
 
+@main.command("next")
+@click.option("--label", "-l", "labels", multiple=True, help="Filter by label")
+@click.option("--assignee", "-a", help="Filter by assignee (use @me for self)")
+@click.option("--status", help="Set project status (default from 'start' shortcut or 'In Progress')")
+@click.option("--shortcut", "shortcut_name", default="start", help="Shortcut to apply (default: start)")
+@click.option("--execute", "-x", is_flag=True, help="Execute (default is dry-run)")
+@click.pass_context
+def next_cmd(
+    ctx: click.Context,
+    labels: tuple[str, ...],
+    assignee: str | None,
+    status: str | None,
+    shortcut_name: str,
+    execute: bool,
+) -> None:
+    """Start working on the next available issue.
+
+    Finds issues that are ready (open, not blocked, no incomplete dependencies)
+    and applies the 'start' shortcut to begin work on one.
+    """
+    token = ctx.obj.get("token")
+    repo = ctx.obj.get("repo")
+    client = get_client(token, repo)
+
+    target_repo = repo or client.get_current_repo()
+
+    try:
+        # Fetch open issues
+        data = client.issue_list(
+            state="open",
+            labels=list(labels) if labels else None,
+            assignee=assignee,
+            limit=50,  # Fetch enough to find ready issues
+            repo=repo,
+        )
+
+        # Parse and filter to ready issues only
+        ready_issues = []
+        for item in data:
+            issue = parse_issue_data(item, target_repo)
+            if issue.ready:
+                ready_issues.append(issue)
+
+        if not ready_issues:
+            output = {
+                "found": False,
+                "message": "No ready issues found",
+                "filters": {
+                    "labels": list(labels) if labels else None,
+                    "assignee": assignee,
+                },
+            }
+            output_json(output)
+            click.echo("\nNo issues are ready to work on.", err=True)
+            sys.exit(0)
+
+        # Select the first ready issue (oldest by default from API)
+        selected = ready_issues[0]
+
+        # Load shortcut configuration
+        config = get_config()
+        shortcut_config = config.shortcuts.get(shortcut_name)
+
+        # Build changes based on shortcut
+        add_assignees: str | None = None
+        add_labels: str | None = None
+        do_close = False
+
+        if shortcut_config:
+            status = status or shortcut_config.status
+            if shortcut_config.assignees:
+                add_assignees = ",".join(shortcut_config.assignees)
+            if shortcut_config.labels_add:
+                add_labels = ",".join(shortcut_config.labels_add)
+            if shortcut_config.close:
+                do_close = True
+        else:
+            # Default "start" behavior
+            status = status or "In Progress"
+            add_assignees = "@me"
+
+        # Build changes dict for output
+        changes: dict[str, Any] = {}
+        before: dict[str, Any] = {}
+        after: dict[str, Any] = {}
+
+        if status:
+            # Get current status from project items
+            current_status = None
+            for pi in selected.project_items:
+                current_status = pi.status
+                break
+            before["project_status"] = current_status
+            after["project_status"] = status
+            changes["project_status"] = {"from": current_status, "to": status}
+
+        if add_assignees:
+            assignees_to_add = [a.strip() for a in add_assignees.split(",")]
+            before["assignees"] = selected.assignees
+            new_assignees = list(set(selected.assignees + assignees_to_add))
+            after["assignees"] = new_assignees
+            changes["assignees_added"] = assignees_to_add
+
+        if add_labels:
+            labels_to_add = [l.strip() for l in add_labels.split(",")]
+            before["labels"] = selected.labels
+            new_labels = list(set(selected.labels + labels_to_add))
+            after["labels"] = new_labels
+            changes["labels_added"] = labels_to_add
+
+        if do_close:
+            before["state"] = selected.state
+            after["state"] = "closed"
+            changes["state"] = {"from": selected.state, "to": "closed"}
+
+        # Dry-run output
+        if not execute:
+            output = {
+                "dry_run": True,
+                "selected_issue": {
+                    "number": selected.number,
+                    "title": selected.title,
+                    "url": selected.url,
+                    "labels": selected.labels,
+                    "assignees": selected.assignees,
+                },
+                "repo": target_repo,
+                "shortcut": shortcut_name,
+                "changes": changes,
+                "ready_count": len(ready_issues),
+            }
+            output_json(output)
+            click.echo("\nRun with --execute (-x) to start working on this issue.", err=True)
+
+            # Log dry-run
+            op = history.create_operation(
+                target=target_repo,
+                type="issue",
+                num=selected.number,
+                action="next",
+                before=before,
+                after=after,
+                dry_run=True,
+            )
+            history.append_operation(op)
+            return
+
+        # Execute changes
+        if add_labels or add_assignees:
+            client.issue_edit(
+                selected.number,
+                add_labels=[l.strip() for l in add_labels.split(",")] if add_labels else None,
+                add_assignees=[a.strip() for a in add_assignees.split(",")] if add_assignees else None,
+                repo=repo,
+            )
+
+        if do_close:
+            client.issue_close(selected.number, repo=repo)
+
+        # Handle project status changes
+        if status:
+            resolver = ProjectResolver(client)
+            project_info = resolver.get_project_info_for_issue(selected.number, target_repo, None)
+            if project_info:
+                resolver.set_status(project_info, status)
+                changes["project"] = project_info.project_title
+
+        # Log executed operation
+        op = history.create_operation(
+            target=target_repo,
+            type="issue",
+            num=selected.number,
+            action="next",
+            before=before,
+            after=after,
+            dry_run=False,
+        )
+        history.append_operation(op)
+
+        output = {
+            "executed": True,
+            "selected_issue": {
+                "number": selected.number,
+                "title": selected.title,
+                "url": selected.url,
+            },
+            "repo": target_repo,
+            "changes": changes,
+            "operation_id": op.id,
+        }
+        output_json(output)
+
+    except GhError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(e.returncode)
+
+
 if __name__ == "__main__":
     main()

@@ -29,15 +29,14 @@ A GitHub-native task management CLI for AI agents. Inspired by [Beads](https://g
 Requires Python 3.13+ and [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated.
 
 ```bash
-# Install globally (recommended)
-uv tool install betterbeads
+# Install from GitHub
+uv tool install git+https://github.com/falense/betterbeads
 
-# Or install from local source
-uv tool install -e /path/to/betterbeads
-
-# Or run without installing
-uvx betterbeads issues
+# Or install from local clone (editable for development)
+uv tool install --force --editable .
 ```
+
+**Why `--editable`?** UV tools install into an isolated environment. Without it, changes to source code require reinstalling. Editable mode links directly to your source, so changes take effect immediately.
 
 This installs two commands:
 - `bb` - primary command (Better Beads)
@@ -84,6 +83,8 @@ bb issues                      # List issues
 bb issues --ready              # Ready to work on
 bb issues --blocked            # Blocked issues
 bb create "Title" [options]    # Create issue
+bb next                        # Pick a ready issue and start work
+bb next -l bug -x              # Start working on next bug
 ```
 
 ### Pull Requests
