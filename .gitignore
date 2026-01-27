@@ -1,0 +1,8 @@
+.devcontainer/
+.transcripts/
+.memories/
+.tmp/
+
+# Python
+__pycache__/
+*.pyc

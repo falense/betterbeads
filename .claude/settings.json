@@ -1,0 +1,148 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/session_issues.py",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/session_stop.py",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "DISABLE_BUG_COMMAND": "1",
+    "DISABLE_TELEMETRY": "1"
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "mcp__GoldenPath__fetch_docs",
+      "mcp__GoldenPath__list_doc_sources",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_wait_for",
+      "mcp__terraform__getProviderDocs",
+      "mcp__terraform__moduleDetails",
+      "mcp__terraform__resolveProviderDocID",
+      "mcp__terraform__searchModules",
+      "Bash(bb --help:*)",
+      "Bash(cat:*)",
+      "Bash(chmod:*)",
+      "Bash(claude plugin install ai-platform@dig)",
+      "Bash(claude plugin install designsystem@dig)",
+      "Bash(claude plugin install iac-platform@dig)",
+      "Bash(claude plugin install km-internal@dig)",
+      "Bash(claude plugin marketplace remove dig)",
+      "Bash(docker exec:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(gh api:*)",
+      "Bash(gh issue close:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh project --help:*)",
+      "Bash(gh project item-list:*)",
+      "Bash(gh project:*)",
+      "Bash(gh run:*)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools add:*)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools commit -m \"$\\(cat <<''EOF''\nchore: sync GitHub issues with TODO.md\n\nCreate phase tracking issues matching TODO.md state:\n- Phases 1-5, 8: Closed \\(completed\\)\n- Phase 6, 7: Open with dependencies on deferred features\n- Individual issues for deferred features and known limitations\nEOF\n\\)\")",
+      "Bash(git -C /home/sondre/Repositories/agent-tools commit -m \"$\\(cat <<''EOF''\ndocs: update README for betterbeads rename and cleanup\n\n- Update README with bb as primary command, ght as alias\n- Update all references from .ght to .betterbeads\n- Add Claude Code plugin section\n- Remove obsolete documentation files \\(AGENTS.md, CLAUDE.md, GEMINI.md, PLAN.md, docs/QUICKREF.md\\)\nEOF\n\\)\")",
+      "Bash(git -C /home/sondre/Repositories/agent-tools commit -m \"$\\(cat <<''EOF''\nfeat: rename to betterbeads and add Claude Code plugin\n\n- Rename package from ght to betterbeads \\(bb command, ght alias kept\\)\n- Move src/ght/ to betterbeads/ \\(flat layout\\)\n- Rename .ght/ to .betterbeads/ for config and history\n- Add Claude Code plugin structure \\(.claude-plugin/plugin.json\\)\n- Add betterbeads skill for Claude Code \\(.claude/skills/\\)\n- Add SessionStart hook to show open issues and prompt bb usage\n- Add Stop hook to prompt continuing work \\(config-gated\\)\n- Switch config format from YAML to JSON\n- Remove pyyaml dependency\nEOF\n\\)\")",
+      "Bash(git -C /home/sondre/Repositories/agent-tools diff --stat)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools log --oneline -3)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools push)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools remote -v)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools remote set-url:*)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools status --short)",
+      "Bash(git -C /home/sondre/Repositories/agent-tools status)",
+      "Bash(git add:*)",
+      "Bash(git commit -m :*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(ln:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(ok pkg add :*)",
+      "Bash(ok pkg install)",
+      "Bash(ok pkg install:*)",
+      "Bash(ok pkg update)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(sort:*)",
+      "Bash(test:*)",
+      "Bash(tree:*)",
+      "Bash(uv run:*)",
+      "Bash(uv:*)",
+      "Bash(uvx:*)",
+      "Skill(bedrock)",
+      "Skill(claude-hooks)",
+      "Skill(claude-skills)",
+      "Skill(dig-ai-platform:*)",
+      "Skill(dig-ai-platform:bedrock)",
+      "Skill(dig-ai-platform:claude-hooks)",
+      "Skill(dig-ai-platform:python)",
+      "Skill(dig-ai-platform:subagent)",
+      "Skill(dig-designsystem:*)",
+      "Skill(dig-designsystem:punkt-docs)",
+      "Skill(dig-iac-platform:*)",
+      "Skill(dig-iac-platform:ok-boilerplate-templates)",
+      "Skill(github-projects)",
+      "Skill(project-overview)",
+      "Skill(uv)"
+    ],
+    "deny": [
+      "Bash(gh project delete:*)",
+      "Bash(gh project field-delete:*)",
+      "Bash(gh project item-delete:*)",
+      "Read(**.ssh/**)",
+      "Read(*.crt)",
+      "Read(*.csr)",
+      "Read(*.key)",
+      "Read(*.p12)",
+      "Read(*.pem)",
+      "Read(*.pfx)",
+      "Read(.aws/**)",
+      "Read(.devcontainer/devcontainer.env)",
+      "Read(.docker/config.json)",
+      "Read(.env**)",
+      "Read(.gnupg/**)",
+      "Read(.secrets**)",
+      "Read(id_ecdsa*)",
+      "Read(id_ed25519*)",
+      "Read(id_rsa*)",
+      "Read(secrets**)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledPlugins": {
+    "ai-platform@dig": true,
+    "iac-platform@dig": true,
+    "designsystem@dig": true
+  },
+  "extraKnownMarketplaces": {
+    "dig": {
+      "source": {
+        "source": "github",
+        "repo": "oslokommune/claude-marketplace"
+      }
+    }
+  }
+}

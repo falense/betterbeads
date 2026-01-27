@@ -1,0 +1,10 @@
+{
+  "shortcuts": {
+    "review": {
+      "add_labels": ["needs-review"]
+    },
+    "blocked": {
+      "add_labels": ["blocked"]
+    }
+  }
+}

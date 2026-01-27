@@ -1,0 +1,20 @@
+[project]
+name = "betterbeads"
+version = "0.1.0"
+description = "Better Beads - A CLI wrapper around gh for simplified GitHub operations for agents"
+readme = "README.md"
+authors = [
+    { name = "Sondre Engebråten", email = "sondre.engebraten@dig.oslo.kommune.no" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.3.1",
+]
+
+[project.scripts]
+bb = "betterbeads.cli:main"
+ght = "betterbeads.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
