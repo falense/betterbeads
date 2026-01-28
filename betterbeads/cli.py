@@ -1865,5 +1865,212 @@ def next_cmd(
         sys.exit(e.returncode)
 
 
+# =============================================================================
+# Hook Commands (for Claude Code integration)
+# =============================================================================
+
+
+@main.group("hook")
+def hook_group() -> None:
+    """Claude Code hook commands.
+
+    These commands are designed to be called from Claude Code hooks.
+    They read hook input from stdin and output markdown for the agent.
+    """
+    pass
+
+
+@hook_group.command("session-start")
+def hook_session_start() -> None:
+    """SessionStart hook - show open issues and guidance.
+
+    Reads hook input JSON from stdin, outputs markdown to stdout.
+    """
+    import shutil
+
+    # Read hook input from stdin
+    hook_input = {}
+    if not sys.stdin.isatty():
+        try:
+            hook_input = json.load(sys.stdin)
+        except json.JSONDecodeError:
+            pass
+
+    cwd = hook_input.get("cwd", ".")
+
+    # Check if we're in a git repo
+    from .gh import GhClient
+    client = GhClient()
+
+    try:
+        repo_name = client.get_current_repo()
+    except Exception:
+        # Not a GitHub repo, exit silently
+        sys.exit(0)
+
+    if not repo_name:
+        sys.exit(0)
+
+    # Check if bb is properly available (sanity check)
+    bb_installed = shutil.which("bb") is not None
+
+    # Get open issues
+    all_issues = []
+    ready_issues = []
+
+    try:
+        data = client.issue_list(state="open", limit=20)
+        for item in data:
+            issue = parse_issue_data(item, repo_name)
+            all_issues.append(issue)
+            if issue.ready:
+                ready_issues.append(issue)
+    except Exception:
+        pass
+
+    # Build output
+    lines = [f"## GitHub Issues for {repo_name}"]
+    lines.append("")
+    lines.append("This project uses GitHub Issues as its issue tracker.")
+    lines.append("**ALWAYS use `bb` for all issue operations** - never use `gh issue` directly.")
+    lines.append("")
+
+    # Add installation instructions if bb is not installed
+    if not bb_installed:
+        lines.extend([
+            "### Installation Required",
+            "",
+            "The `bb` command is not installed. Install it with:",
+            "",
+            "```bash",
+            "uv tool install git+https://github.com/falense/betterbeads",
+            "```",
+            "",
+            "Or for local development (from the betterbeads repo):",
+            "```bash",
+            "uv tool install --force --editable .",
+            "```",
+            "",
+        ])
+
+    lines.append("### Issue Requirement")
+    lines.append("**All work must have an accompanying GitHub issue.**")
+    lines.append("This includes code changes, git operations, configuration, refactoring - everything.")
+    lines.append("- Before starting ANY work, identify or create the relevant issue")
+    lines.append("- If no issue exists for the requested work, create one with `bb create`")
+    lines.append("- Reference the issue number in commits")
+    lines.append("")
+
+    if not all_issues:
+        lines.append("No open issues found.")
+        lines.append("")
+        click.echo("\n".join(lines))
+        sys.exit(0)
+
+    if ready_issues:
+        lines.append(f"### Ready for Work ({len(ready_issues)} issues)")
+        lines.append("These issues have no blockers and all dependencies are complete:")
+        lines.append("")
+        for issue in ready_issues:
+            lines.append(_format_issue_for_hook(issue))
+            lines.append("")
+
+    # Show other open issues
+    ready_numbers = {i.number for i in ready_issues}
+    other_issues = [i for i in all_issues if i.number not in ready_numbers]
+
+    if other_issues:
+        lines.append(f"### Other Open Issues ({len(other_issues)} issues)")
+        lines.append("")
+        for issue in other_issues[:10]:
+            lines.append(_format_issue_for_hook(issue))
+            lines.append("")
+
+    total = len(all_issues)
+    if total > 20:
+        lines.append(f"... and {total - 20} more open issues")
+
+    click.echo("\n".join(lines))
+    sys.exit(0)
+
+
+@hook_group.command("session-stop")
+def hook_session_stop() -> None:
+    """Stop hook - prompt to continue working on ready issues.
+
+    Only outputs if enabled in .betterbeads/config.json:
+    {"hooks": {"session_stop": {"enabled": true}}}
+    """
+    # Read hook input from stdin
+    hook_input = {}
+    if not sys.stdin.isatty():
+        try:
+            hook_input = json.load(sys.stdin)
+        except json.JSONDecodeError:
+            pass
+
+    cwd = hook_input.get("cwd", ".")
+
+    # Load config and check if hook is enabled
+    config = get_config()
+    hooks_config = config.raw.get("hooks", {}) if hasattr(config, "raw") else {}
+    session_stop_config = hooks_config.get("session_stop", {})
+    if not session_stop_config.get("enabled", False):
+        sys.exit(0)
+
+    # Check if we're in a git repo
+    from .gh import GhClient
+    client = GhClient()
+
+    try:
+        repo_name = client.get_current_repo()
+    except Exception:
+        sys.exit(0)
+
+    if not repo_name:
+        sys.exit(0)
+
+    # Get ready issues
+    ready_issues = []
+    try:
+        data = client.issue_list(state="open", limit=10)
+        for item in data:
+            issue = parse_issue_data(item, repo_name)
+            if issue.ready:
+                ready_issues.append(issue)
+    except Exception:
+        pass
+
+    if not ready_issues:
+        sys.exit(0)
+
+    # Build output
+    lines = []
+    lines.append("")
+    lines.append("---")
+    lines.append(f"## More Work Available in {repo_name}")
+    lines.append("")
+    lines.append(f"There are {len(ready_issues)} issue(s) ready to work on:")
+    lines.append("")
+    for issue in ready_issues[:5]:
+        lines.append(f"  - #{issue.number}: {issue.title}")
+    lines.append("")
+    lines.append("Use `bb issue <number>` to view details and continue working.")
+    lines.append("")
+
+    click.echo("\n".join(lines))
+    sys.exit(0)
+
+
+def _format_issue_for_hook(issue: Issue) -> str:
+    """Format an issue for hook output."""
+    parts = [f"#{issue.number}: {issue.title}"]
+    if issue.labels:
+        parts.append(f"  Labels: {', '.join(issue.labels)}")
+    if issue.assignees:
+        parts.append(f"  Assigned: {', '.join(issue.assignees)}")
+    return "\n".join(parts)
+
+
 if __name__ == "__main__":
     main()

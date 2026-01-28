@@ -41,6 +41,7 @@ class GhtConfig:
     blocked_indicators: BlockedIndicators = field(default_factory=BlockedIndicators)
     dependencies: DependencyConfig = field(default_factory=DependencyConfig)
     shortcuts: dict[str, ShortcutConfig] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict)  # Raw config data for hook access
 
     @classmethod
     def default(cls) -> "GhtConfig":
@@ -118,6 +119,9 @@ def load_config(config_path: Path | None = None) -> GhtConfig:
 
         if not data:
             return config
+
+        # Store raw config for hook access
+        config.raw = data
 
         # Parse blocked_indicators
         if "blocked_indicators" in data:

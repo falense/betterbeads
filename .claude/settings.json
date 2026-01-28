@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/session_issues.py",
+            "command": "bb hook session-start",
             "timeout": 60
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/session_stop.py",
+            "command": "bb hook session-stop",
             "timeout": 60
           }
         ]
@@ -42,7 +42,12 @@
       "mcp__terraform__moduleDetails",
       "mcp__terraform__resolveProviderDocID",
       "mcp__terraform__searchModules",
+      "Bash(./bb issue:*)",
       "Bash(bb --help:*)",
+      "Bash(bb create:*)",
+      "Bash(bb issue:*)",
+      "Bash(bb next --help:*)",
+      "Bash(bb next:*)",
       "Bash(cat:*)",
       "Bash(chmod:*)",
       "Bash(claude plugin install ai-platform@dig)",
@@ -76,6 +81,7 @@
       "Bash(git commit -m :*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
+      "Bash(grep:*)",
       "Bash(ln:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
