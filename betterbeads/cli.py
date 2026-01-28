@@ -1881,7 +1881,8 @@ def hook_group() -> None:
 
 
 @hook_group.command("session-start")
-def hook_session_start() -> None:
+@click.pass_context
+def hook_session_start(ctx: click.Context) -> None:
     """SessionStart hook - show open issues and guidance.
 
     Reads hook input JSON from stdin, outputs markdown to stdout.
@@ -1898,15 +1899,19 @@ def hook_session_start() -> None:
 
     cwd = hook_input.get("cwd", ".")
 
-    # Check if we're in a git repo
+    # Get repo from context (--repo option) or auto-detect
+    repo = ctx.obj.get("repo")
     from .gh import GhClient
-    client = GhClient()
+    client = GhClient(repo=repo)
 
-    try:
-        repo_name = client.get_current_repo()
-    except Exception:
-        # Not a GitHub repo, exit silently
-        sys.exit(0)
+    if repo:
+        repo_name = repo
+    else:
+        try:
+            repo_name = client.get_current_repo()
+        except Exception:
+            # Not a GitHub repo, exit silently
+            sys.exit(0)
 
     if not repo_name:
         sys.exit(0)
@@ -1993,7 +1998,8 @@ def hook_session_start() -> None:
 
 
 @hook_group.command("session-stop")
-def hook_session_stop() -> None:
+@click.pass_context
+def hook_session_stop(ctx: click.Context) -> None:
     """Stop hook - prompt to continue working on ready issues.
 
     Only outputs if enabled in .betterbeads/config.json:
@@ -2016,14 +2022,18 @@ def hook_session_stop() -> None:
     if not session_stop_config.get("enabled", False):
         sys.exit(0)
 
-    # Check if we're in a git repo
+    # Get repo from context (--repo option) or auto-detect
+    repo = ctx.obj.get("repo")
     from .gh import GhClient
-    client = GhClient()
+    client = GhClient(repo=repo)
 
-    try:
-        repo_name = client.get_current_repo()
-    except Exception:
-        sys.exit(0)
+    if repo:
+        repo_name = repo
+    else:
+        try:
+            repo_name = client.get_current_repo()
+        except Exception:
+            sys.exit(0)
 
     if not repo_name:
         sys.exit(0)
