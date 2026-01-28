@@ -25,7 +25,7 @@ from .models import (
     User,
 )
 from .config import get_config
-from .parser import add_dependencies, parse_dependencies, remove_dependencies
+from .parser import add_dependencies, parse_dependencies, remove_dependencies, set_task_complete
 from .project import ProjectResolver
 
 
@@ -445,6 +445,71 @@ def parse_pr_data(data: dict[str, Any], repo: str, checks: list[dict] | None = N
     )
 
 
+def _auto_check_referencing_issues(
+    client: "GhClient",
+    closed_number: int,
+    repo: str,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Auto-check task items referencing a closed issue.
+
+    When an issue is closed, this function finds all other open issues that
+    reference it in task list items (e.g., `- [ ] #N`) and marks them as
+    complete (e.g., `- [x] #N`).
+
+    Args:
+        client: GhClient for GitHub operations
+        closed_number: The issue number that was just closed
+        repo: Repository in owner/repo format
+        dry_run: If True, don't make changes, just report what would happen
+
+    Returns:
+        Dict with 'updated' list of successfully updated issues and
+        'errors' list of failures.
+    """
+    result: dict[str, Any] = {"updated": [], "errors": []}
+
+    # Search for open issues that might reference this one
+    try:
+        matches = client.search_issues(f"#{closed_number} in:body is:open", repo=repo)
+    except Exception as e:
+        result["errors"].append(f"Search failed: {e}")
+        return result
+
+    for match in matches:
+        match_number = match["number"]
+        if match_number == closed_number:
+            continue  # Skip self
+
+        try:
+            # Fetch full issue body
+            issue_data = client.issue_view(match_number, repo=repo)
+            old_body = issue_data.get("body", "") or ""
+
+            # Try to check off the task item
+            new_body = set_task_complete(old_body, closed_number, repo=None, complete=True)
+
+            if new_body != old_body:
+                if dry_run:
+                    result["updated"].append({
+                        "number": match_number,
+                        "action": "would check off"
+                    })
+                else:
+                    client.issue_edit(match_number, body=new_body, repo=repo)
+                    result["updated"].append({
+                        "number": match_number,
+                        "action": "checked off"
+                    })
+        except Exception as e:
+            result["errors"].append({
+                "number": match_number,
+                "error": str(e)
+            })
+
+    return result
+
+
 @click.group()
 @click.option("--token", envvar="GHT_TOKEN", help="GitHub token")
 @click.option("--repo", "-R", help="Repository in owner/repo format")
@@ -726,12 +791,21 @@ def issue_cmd(
 
         # Output dry-run diff
         if not execute:
-            output = {
+            output: dict[str, Any] = {
                 "dry_run": True,
                 "issue": number,
                 "repo": target_repo,
                 "changes": changes,
             }
+
+            # Preview cascade auto-check if closing
+            if do_close:
+                cascade_preview = _auto_check_referencing_issues(
+                    client, number, target_repo, dry_run=True
+                )
+                if cascade_preview["updated"]:
+                    output["would_auto_check"] = cascade_preview["updated"]
+
             output_json(output)
             click.echo("\nRun with --execute (-x) to apply changes.", err=True)
 
@@ -749,9 +823,19 @@ def issue_cmd(
             return
 
         # Execute changes
+        cascade_updates: list[dict[str, Any]] = []
+        cascade_errors: list[Any] = []
+
         if do_close:
             client.issue_close(number, reason=reason, comment=comment_text, repo=repo)
             comment_text = None  # Don't double-comment
+
+            # Auto-check task items in referencing issues
+            cascade_result = _auto_check_referencing_issues(
+                client, number, target_repo, dry_run=False
+            )
+            cascade_updates = cascade_result.get("updated", [])
+            cascade_errors = cascade_result.get("errors", [])
 
         if do_reopen:
             client.issue_reopen(number, comment=comment_text, repo=repo)
@@ -801,7 +885,7 @@ def issue_cmd(
         history.append_operation(op)
 
         # Output result
-        output = {
+        output: dict[str, Any] = {
             "executed": True,
             "issue": number,
             "repo": target_repo,
@@ -809,6 +893,13 @@ def issue_cmd(
             "changes": changes,
             "operation_id": op.id,
         }
+
+        if cascade_updates:
+            output["auto_checked"] = cascade_updates
+
+        if cascade_errors:
+            output["cascade_errors"] = cascade_errors
+
         output_json(output)
 
     except GhError as e:
