@@ -36,6 +36,26 @@ def find_git_root() -> Path | None:
     return None
 
 
+def get_last_commit_timestamp() -> str | None:
+    """Get the timestamp of the last git commit in ISO format.
+
+    Returns:
+        ISO format timestamp of the last commit, or None if not in a git repo
+        or no commits exist.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%cI"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass
+    return None
+
+
 def get_history_path() -> Path | None:
     """Get the path to the history file."""
     git_root = find_git_root()

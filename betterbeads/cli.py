@@ -1104,12 +1104,18 @@ def history_cmd(
 @main.command("undo")
 @click.argument("operation_id", required=False)
 @click.option("--last", "-n", type=int, default=1, help="Undo last N operations")
+@click.option(
+    "--since-commit",
+    is_flag=True,
+    help="Undo all operations since the last git commit",
+)
 @click.option("--execute", "-x", is_flag=True, help="Execute undo (default is dry-run)")
 @click.pass_context
 def undo_cmd(
     ctx: click.Context,
     operation_id: str | None,
     last: int,
+    since_commit: bool,
     execute: bool,
 ) -> None:
     """Undo an operation."""
@@ -1124,6 +1130,21 @@ def undo_cmd(
             click.echo(f"Operation {operation_id} not found", err=True)
             sys.exit(1)
         operations = [op]
+    elif since_commit:
+        # Undo all operations since the last commit
+        commit_ts = history.get_last_commit_timestamp()
+        if not commit_ts:
+            click.echo("No git commits found", err=True)
+            sys.exit(1)
+        operations = history.read_history(since=commit_ts)
+        # Filter out dry-runs and undo operations
+        operations = [
+            op for op in operations if not op.dry_run and not op.action.startswith("undo:")
+        ]
+        if not operations:
+            click.echo(f"No operations to undo since last commit ({commit_ts})", err=True)
+            sys.exit(0)
+        click.echo(f"Found {len(operations)} operation(s) since last commit ({commit_ts})")
     else:
         # Undo last N operations
         operations = history.read_history(limit=last)
