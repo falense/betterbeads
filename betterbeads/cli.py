@@ -1929,10 +1929,9 @@ def hook_session_start() -> None:
         pass
 
     # Build output
-    lines = [f"## GitHub Issues for {repo_name}"]
+    lines = [f"## GitHub Context for {repo_name}"]
     lines.append("")
-    lines.append("This project uses GitHub Issues as its issue tracker.")
-    lines.append("**ALWAYS use `bb` for all issue operations** - never use `gh issue` directly.")
+    lines.append("**ALWAYS use `bb` for all GitHub operations** (issues, PRs, projects) - never use `gh` directly.")
     lines.append("")
 
     # Add installation instructions if bb is not installed
@@ -1955,9 +1954,8 @@ def hook_session_start() -> None:
 
     lines.append("### Issue Requirement")
     lines.append("**All work must have an accompanying GitHub issue.**")
-    lines.append("This includes code changes, git operations, configuration, refactoring - everything.")
     lines.append("- Before starting ANY work, identify or create the relevant issue")
-    lines.append("- If no issue exists for the requested work, create one with `bb create`")
+    lines.append("- If no issue exists, create one with `bb create`")
     lines.append("- Reference the issue number in commits")
     lines.append("")
 
