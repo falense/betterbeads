@@ -1,4 +1,4 @@
-"""Task list parsing and modification for dependencies."""
+"""Task list parsing and modification for dependencies and general task items."""
 
 import re
 from dataclasses import dataclass
@@ -26,6 +26,22 @@ class TaskItem:
         return f"- {checkbox} {ref}"
 
 
+@dataclass
+class GeneralTaskItem:
+    """A general task list item (not necessarily referencing an issue)."""
+
+    text: str
+    complete: bool
+    line_number: int  # 1-indexed line number in the content
+    start_pos: int  # Character position in the content
+    end_pos: int  # End character position
+
+    def to_markdown(self) -> str:
+        """Convert to markdown task list item."""
+        checkbox = "[x]" if self.complete else "[ ]"
+        return f"- {checkbox} {self.text}"
+
+
 # Pattern to match task list items with issue references
 # Matches: - [ ] #123, - [x] #456, - [ ] owner/repo#789, - [x] owner/repo#101 description
 TASK_ITEM_PATTERN = re.compile(
@@ -36,6 +52,19 @@ TASK_ITEM_PATTERN = re.compile(
 # Pattern to find the Dependencies section
 DEPS_SECTION_PATTERN = re.compile(
     r"(^---\n)?^## Dependencies\n(.*?)(?=^## |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+
+# Pattern to match any task list item (general, not just issue references)
+# Matches: - [ ] Any text here, - [x] Completed item, - [X] Also completed
+GENERAL_TASK_PATTERN = re.compile(
+    r"^- \[([ xX])\] (.+)$",
+    re.MULTILINE,
+)
+
+# Pattern to find markdown sections by header
+SECTION_PATTERN = re.compile(
+    r"^(#{1,6}) ([^\n]+)\n(.*?)(?=^#{1,6} |\Z)",
     re.MULTILINE | re.DOTALL,
 )
 
@@ -247,3 +276,196 @@ def set_task_complete(
         return match.group(0)
 
     return TASK_ITEM_PATTERN.sub(replace_checkbox, body)
+
+
+def find_all_task_items(content: str) -> list[GeneralTaskItem]:
+    """Find all task list items in the content.
+
+    Returns a list of GeneralTaskItem objects with their positions.
+    """
+    items = []
+    lines = content.split("\n")
+    current_pos = 0
+
+    for line_num, line in enumerate(lines, start=1):
+        match = GENERAL_TASK_PATTERN.match(line)
+        if match:
+            checkbox, text = match.groups()
+            items.append(
+                GeneralTaskItem(
+                    text=text,
+                    complete=checkbox.lower() == "x",
+                    line_number=line_num,
+                    start_pos=current_pos,
+                    end_pos=current_pos + len(line),
+                )
+            )
+        current_pos += len(line) + 1  # +1 for newline
+
+    return items
+
+
+def toggle_task_by_text(
+    content: str,
+    pattern: str,
+    complete: bool,
+    case_sensitive: bool = False,
+) -> tuple[str, list[GeneralTaskItem]]:
+    """Toggle task items matching a text pattern.
+
+    Args:
+        content: The markdown content
+        pattern: Text to match (substring match)
+        complete: Whether to mark as complete
+        case_sensitive: Whether to match case-sensitively
+
+    Returns:
+        Tuple of (updated content, list of toggled items)
+    """
+    items = find_all_task_items(content)
+    toggled = []
+
+    search_pattern = pattern if case_sensitive else pattern.lower()
+
+    for item in items:
+        item_text = item.text if case_sensitive else item.text.lower()
+        if search_pattern in item_text:
+            toggled.append(item)
+
+    if not toggled:
+        return content, []
+
+    # Apply changes from end to start to preserve positions
+    result = content
+    for item in reversed(toggled):
+        new_line = f"- [{'x' if complete else ' '}] {item.text}"
+        result = result[: item.start_pos] + new_line + result[item.end_pos :]
+
+    # Update the toggled items with new state
+    for item in toggled:
+        item.complete = complete
+
+    return result, toggled
+
+
+def toggle_task_at_line(
+    content: str,
+    line_number: int,
+    complete: bool,
+) -> tuple[str, GeneralTaskItem | None]:
+    """Toggle a task item at a specific line number.
+
+    Args:
+        content: The markdown content
+        line_number: 1-indexed line number
+        complete: Whether to mark as complete
+
+    Returns:
+        Tuple of (updated content, toggled item or None if not found)
+    """
+    items = find_all_task_items(content)
+
+    for item in items:
+        if item.line_number == line_number:
+            new_line = f"- [{'x' if complete else ' '}] {item.text}"
+            result = content[: item.start_pos] + new_line + content[item.end_pos :]
+            item.complete = complete
+            return result, item
+
+    return content, None
+
+
+@dataclass
+class Section:
+    """A markdown section with header and content."""
+
+    header: str
+    level: int  # Header level (1-6)
+    content: str
+    start_pos: int
+    end_pos: int
+    header_start: int  # Position where header line starts
+    content_start: int  # Position where content starts (after header line)
+
+
+def find_section(content: str, header: str) -> Section | None:
+    """Find a section by its header text.
+
+    Args:
+        content: The markdown content
+        header: Header text to find (case-insensitive)
+
+    Returns:
+        Section object or None if not found
+    """
+    for match in SECTION_PATTERN.finditer(content):
+        hashes, header_text, section_content = match.groups()
+        if header_text.strip().lower() == header.lower():
+            # Calculate positions
+            start_pos = match.start()
+            end_pos = match.end()
+            header_line = f"{hashes} {header_text}\n"
+            content_start = start_pos + len(header_line)
+
+            return Section(
+                header=header_text.strip(),
+                level=len(hashes),
+                content=section_content,
+                start_pos=start_pos,
+                end_pos=end_pos,
+                header_start=start_pos,
+                content_start=content_start,
+            )
+
+    return None
+
+
+def replace_section_content(content: str, header: str, new_content: str) -> str:
+    """Replace the content of a section (keeps header).
+
+    Args:
+        content: The markdown content
+        header: Header text of section to replace
+        new_content: New content for the section
+
+    Returns:
+        Updated content
+    """
+    section = find_section(content, header)
+    if not section:
+        return content
+
+    # Ensure new_content ends with newline if original did
+    if new_content and not new_content.endswith("\n"):
+        new_content += "\n"
+
+    # Keep the header, replace just the content
+    header_line = f"{'#' * section.level} {section.header}\n"
+
+    return (
+        content[: section.start_pos]
+        + header_line
+        + new_content
+        + content[section.end_pos :]
+    )
+
+
+def append_to_section(content: str, header: str, text: str) -> str:
+    """Append text to the end of a section.
+
+    Args:
+        content: The markdown content
+        header: Header text of section to append to
+        text: Text to append
+
+    Returns:
+        Updated content
+    """
+    section = find_section(content, header)
+    if not section:
+        return content
+
+    # Insert before the end of section
+    new_section_content = section.content.rstrip() + "\n" + text + "\n"
+
+    return replace_section_content(content, header, new_section_content)

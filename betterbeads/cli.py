@@ -584,6 +584,13 @@ def main(ctx: click.Context, token: str | None, repo: str | None) -> None:
 @click.option("--done", "do_done", is_flag=True, help="Shortcut: --close --status 'Done'")
 @click.option("--shortcut", "shortcut_name", help="Apply a configured shortcut by name")
 @click.option("--tree", "show_tree", is_flag=True, help="Show dependency tree")
+@click.option("--check", "check_text", help="Check (complete) task items matching text")
+@click.option("--uncheck", "uncheck_text", help="Uncheck task items matching text")
+@click.option("--check-line", "check_line", type=int, help="Check task item at line number")
+@click.option("--uncheck-line", "uncheck_line", type=int, help="Uncheck task item at line number")
+@click.option("--edit-comment", "edit_comment_id", help="Edit a comment by ID")
+@click.option("--section", "section_name", help="Target a specific section for --body or --append")
+@click.option("--append", "append_text", help="Append text to issue body (or section if --section used)")
 @click.option("--execute", "-x", is_flag=True, help="Execute changes (default is dry-run)")
 @click.pass_context
 def issue_cmd(
@@ -609,6 +616,13 @@ def issue_cmd(
     do_done: bool,
     shortcut_name: str | None,
     show_tree: bool,
+    check_text: str | None,
+    uncheck_text: str | None,
+    check_line: int | None,
+    uncheck_line: int | None,
+    edit_comment_id: str | None,
+    section_name: str | None,
+    append_text: str | None,
     execute: bool,
 ) -> None:
     """View or modify an issue.
@@ -680,6 +694,8 @@ def issue_cmd(
         add_labels, remove_labels, add_assignees, remove_assignees,
         add_deps, remove_deps, milestone, status, set_fields,
         start, do_done, shortcut_name,
+        check_text, uncheck_text, check_line, uncheck_line,
+        edit_comment_id, append_text,
     ])
 
     try:
@@ -784,6 +800,119 @@ def issue_cmd(
             before["body"] = current_issue.body
             after["body"] = new_body
             changes["dependencies_removed"] = deps_to_remove
+
+        # Task list toggling
+        if check_text or uncheck_text:
+            from betterbeads.parser import toggle_task_by_text
+
+            base_body = after.get("body", current_issue.body)
+            if check_text:
+                new_body, toggled = toggle_task_by_text(base_body, check_text, complete=True)
+                if toggled:
+                    before["body"] = current_issue.body
+                    after["body"] = new_body
+                    changes["tasks_checked"] = [{"text": t.text, "line": t.line_number} for t in toggled]
+                else:
+                    click.echo(f"Warning: No task items matching '{check_text}' found", err=True)
+            if uncheck_text:
+                base_body = after.get("body", current_issue.body)
+                new_body, toggled = toggle_task_by_text(base_body, uncheck_text, complete=False)
+                if toggled:
+                    before["body"] = current_issue.body
+                    after["body"] = new_body
+                    changes["tasks_unchecked"] = [{"text": t.text, "line": t.line_number} for t in toggled]
+                else:
+                    click.echo(f"Warning: No task items matching '{uncheck_text}' found", err=True)
+
+        if check_line or uncheck_line:
+            from betterbeads.parser import toggle_task_at_line
+
+            if check_line:
+                base_body = after.get("body", current_issue.body)
+                new_body, toggled = toggle_task_at_line(base_body, check_line, complete=True)
+                if toggled:
+                    before["body"] = current_issue.body
+                    after["body"] = new_body
+                    changes["task_checked_at_line"] = {"text": toggled.text, "line": check_line}
+                else:
+                    click.echo(f"Warning: No task item found at line {check_line}", err=True)
+            if uncheck_line:
+                base_body = after.get("body", current_issue.body)
+                new_body, toggled = toggle_task_at_line(base_body, uncheck_line, complete=False)
+                if toggled:
+                    before["body"] = current_issue.body
+                    after["body"] = new_body
+                    changes["task_unchecked_at_line"] = {"text": toggled.text, "line": uncheck_line}
+                else:
+                    click.echo(f"Warning: No task item found at line {uncheck_line}", err=True)
+
+        # Section-based editing
+        if section_name and body is not None:
+            from betterbeads.parser import replace_section_content
+
+            base_body = current_issue.body  # Start from original for section replacement
+            new_body = replace_section_content(base_body, section_name, body)
+            if new_body == base_body:
+                click.echo(f"Warning: Section '{section_name}' not found", err=True)
+            else:
+                before["body"] = current_issue.body
+                after["body"] = new_body
+                changes["section_replaced"] = section_name
+
+        if append_text:
+            from betterbeads.parser import append_to_section
+
+            base_body = after.get("body", current_issue.body)
+            if section_name:
+                new_body = append_to_section(base_body, section_name, append_text)
+                if new_body == base_body:
+                    click.echo(f"Warning: Section '{section_name}' not found", err=True)
+                else:
+                    before["body"] = current_issue.body
+                    after["body"] = new_body
+                    changes["appended_to_section"] = {"section": section_name, "text": append_text}
+            else:
+                # Append to end of body
+                new_body = base_body.rstrip() + "\n" + append_text + "\n"
+                before["body"] = current_issue.body
+                after["body"] = new_body
+                changes["appended_to_body"] = append_text
+
+        # Comment editing
+        comment_edit_info = None
+        if edit_comment_id:
+            # Find the comment
+            comment_found = None
+            for c in current_issue.comments:
+                # Handle both numeric ID and full node ID
+                if str(c.id) == edit_comment_id or edit_comment_id in str(c.id):
+                    comment_found = c
+                    break
+            if not comment_found:
+                click.echo(f"Error: Comment with ID '{edit_comment_id}' not found", err=True)
+                click.echo("Available comment IDs:", err=True)
+                for c in current_issue.comments:
+                    click.echo(f"  {c.id} (by {c.author})", err=True)
+                sys.exit(1)
+
+            # The body parameter is used for the new comment content
+            if body is None:
+                click.echo("Error: --body is required when using --edit-comment", err=True)
+                sys.exit(1)
+
+            comment_edit_info = {
+                "comment_id": comment_found.id,
+                "old_body": comment_found.body,
+                "new_body": body,
+            }
+            before["comment_body"] = comment_found.body
+            after["comment_body"] = body
+            changes["comment_edited"] = {"id": comment_found.id, "author": comment_found.author}
+            # Don't also modify the issue body
+            if "body" in after and after["body"] == body:
+                del after["body"]
+                if "body" in changes:
+                    del changes["body"]
 
         if comment_text:
             changes["comment"] = comment_text
@@ -898,6 +1027,14 @@ def issue_cmd(
         # Handle standalone comment
         if comment_text:
             client.issue_comment(number, comment_text, repo=repo)
+
+        # Handle comment editing
+        if comment_edit_info:
+            client.comment_edit(
+                comment_id=comment_edit_info["comment_id"],
+                body=comment_edit_info["new_body"],
+                repo=repo,
+            )
 
         # Handle project status changes
         if project_info and status:

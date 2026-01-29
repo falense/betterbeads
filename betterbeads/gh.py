@@ -270,6 +270,55 @@ class GhClient:
             repo=repo,
         )
 
+    def comment_edit(
+        self,
+        comment_id: int,
+        body: str,
+        repo: str | None = None,
+    ) -> dict[str, Any]:
+        """Edit an issue comment using GraphQL.
+
+        Args:
+            comment_id: The numeric ID of the comment (from IC_kwXXXX)
+            body: New body content
+            repo: Repository (unused, but kept for consistency)
+
+        Returns:
+            Dict with updated comment info
+        """
+        # Convert numeric ID to GraphQL node ID format
+        # GitHub issue comment IDs start with IC_ prefix
+        # The GraphQL ID is base64 of "012:IssueComment{id}"
+        import base64
+
+        node_id = base64.b64encode(f"012:IssueComment{comment_id}".encode()).decode()
+
+        query = """
+        mutation($id: ID!, $body: String!) {
+          updateIssueComment(input: {id: $id, body: $body}) {
+            issueComment {
+              id
+              body
+            }
+          }
+        }
+        """
+
+        result = self.run(
+            [
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-f",
+                f"id={node_id}",
+                "-f",
+                f"body={body}",
+            ]
+        )
+        data = result.json()
+        return data.get("data", {}).get("updateIssueComment", {}).get("issueComment", {})
+
     # PR operations
 
     def pr_view(self, number: int, repo: str | None = None) -> dict[str, Any]:
