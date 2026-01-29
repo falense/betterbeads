@@ -1,5 +1,6 @@
 """CLI interface for ght."""
 
+import functools
 import json
 import sys
 from typing import Any
@@ -27,6 +28,42 @@ from .models import (
 from .config import get_config
 from .parser import add_dependencies, parse_dependencies, remove_dependencies, set_task_complete
 from .project import ProjectResolver
+
+
+def _merge_repo_callback(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> str | None:
+    """Callback to merge command-level --repo into context."""
+    if value:
+        ctx.ensure_object(dict)
+        ctx.obj["repo"] = value
+    return value
+
+
+def with_repo_option(f: Any) -> Any:
+    """Add --repo option that can be used at command level.
+
+    This allows --repo to be specified either globally (before the command)
+    or at the command level (after the command). Command-level takes precedence.
+
+    Example:
+        bb --repo owner/repo issue 123  # global
+        bb issue --repo owner/repo 123  # command-level (now works!)
+    """
+    @click.option(
+        "--repo",
+        "-R",
+        default=None,
+        help="Repository in owner/repo format",
+        expose_value=False,  # Don't add to function signature
+        is_eager=True,  # Process before other options
+        callback=_merge_repo_callback,
+    )
+    @functools.wraps(f)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return f(*args, **kwargs)
+
+    return wrapper
 
 
 def output_json(data: Any) -> None:
@@ -525,6 +562,7 @@ def main(ctx: click.Context, token: str | None, repo: str | None) -> None:
 
 
 @main.command("issue")
+@with_repo_option
 @click.argument("number", type=int)
 @click.option("--close", "do_close", is_flag=True, help="Close the issue")
 @click.option("--reopen", "do_reopen", is_flag=True, help="Reopen the issue")
@@ -908,6 +946,7 @@ def issue_cmd(
 
 
 @main.command("issues")
+@with_repo_option
 @click.option("--state", type=click.Choice(["open", "closed", "all"]), default="open")
 @click.option("--label", "-l", "labels", multiple=True, help="Filter by label")
 @click.option("--assignee", "-a", help="Filter by assignee")
@@ -965,6 +1004,7 @@ def issues_cmd(
 
 
 @main.command("create")
+@with_repo_option
 @click.argument("title")
 @click.option("--body", "-b", default="", help="Issue body")
 @click.option("--labels", "-l", help="Labels (comma-separated)")
@@ -1102,6 +1142,7 @@ def history_cmd(
 
 
 @main.command("undo")
+@with_repo_option
 @click.argument("operation_id", required=False)
 @click.option("--last", "-n", type=int, default=1, help="Undo last N operations")
 @click.option(
@@ -1296,6 +1337,7 @@ def init_cmd() -> None:
 
 
 @main.command("pr")
+@with_repo_option
 @click.argument("number", type=int)
 @click.option("--approve", is_flag=True, help="Approve the PR")
 @click.option("--request-changes", is_flag=True, help="Request changes")
@@ -1608,6 +1650,7 @@ def pr_cmd(
 
 
 @main.command("prs")
+@with_repo_option
 @click.option("--state", type=click.Choice(["open", "closed", "merged", "all"]), default="open")
 @click.option("--label", "-l", "labels", multiple=True, help="Filter by label")
 @click.option("--assignee", "-a", help="Filter by assignee")
@@ -1670,6 +1713,7 @@ def prs_cmd(
 
 
 @main.command("pr-create")
+@with_repo_option
 @click.argument("title")
 @click.option("--body", "-b", default="", help="PR body")
 @click.option("--base", help="Base branch (default: repo default)")
@@ -1781,6 +1825,7 @@ def pr_create_cmd(
 
 
 @main.command("next")
+@with_repo_option
 @click.option("--label", "-l", "labels", multiple=True, help="Filter by label")
 @click.option("--assignee", "-a", help="Filter by assignee (use @me for self)")
 @click.option("--status", help="Set project status (default from 'start' shortcut or 'In Progress')")
@@ -1993,6 +2038,7 @@ def hook_group() -> None:
 
 
 @hook_group.command("session-start")
+@with_repo_option
 @click.pass_context
 def hook_session_start(ctx: click.Context) -> None:
     """SessionStart hook - show open issues and guidance.
@@ -2110,6 +2156,7 @@ def hook_session_start(ctx: click.Context) -> None:
 
 
 @hook_group.command("session-stop")
+@with_repo_option
 @click.pass_context
 def hook_session_stop(ctx: click.Context) -> None:
     """Stop hook - prompt to continue working on ready issues.
