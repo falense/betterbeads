@@ -1,32 +1,8 @@
 {
   "name": "betterbeads",
   "description": "Better Beads (bb) - simplified GitHub operations for agents with complete context, dependency tracking, and undo capability",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": {
     "name": "agent-tools"
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bb hook session-start",
-            "timeout": 60
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bb hook session-stop",
-            "timeout": 60
-          }
-        ]
-      }
-    ]
   }
 }
