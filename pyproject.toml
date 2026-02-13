@@ -1,6 +1,6 @@
 [project]
 name = "betterbeads"
-version = "0.1.0"
+version = "0.1.1"
 description = "Better Beads - A CLI wrapper around gh for simplified GitHub operations for agents"
 readme = "README.md"
 authors = [

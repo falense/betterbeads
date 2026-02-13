@@ -1,7 +1,7 @@
 {
   "name": "betterbeads",
   "description": "Better Beads (bb) - simplified GitHub operations for agents with complete context, dependency tracking, and undo capability",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "agent-tools"
   },
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/session_stop.py",
+            "command": "bb hook session-stop",
             "timeout": 60
           }
         ]
