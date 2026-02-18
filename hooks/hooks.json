@@ -16,6 +16,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hooks/session-stop.md\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "bb hook session-stop",
             "timeout": 60
           }
