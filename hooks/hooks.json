@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bb hook session-start",
-            "timeout": 60
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.md\"",
+            "timeout": 10
           }
         ]
       }
