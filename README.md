@@ -52,7 +52,7 @@ uv tool uninstall betterbeads
 ## Quick Start
 
 ```bash
-# Initialize in your repo
+# Initialize in your repo (run this once per repo)
 bb init
 
 # View an issue with full context (comments, dependencies, project status)
@@ -224,9 +224,19 @@ All commands output JSON for easy parsing:
 }
 ```
 
+## Setup for AI Agents
+
+After installing `bb`, run `bb init` in each repository where you want agents to use it. This command:
+
+1. Creates the `.betterbeads/` directory for history/undo tracking
+2. Configures a git merge driver for `history.jsonl`
+3. Adds a `## BetterBeads` section to `~/.claude/CLAUDE.md` with workflow instructions
+
+Step 3 is what tells Claude Code agents to use `bb` for all GitHub operations. Without running `bb init`, agents will default to using `gh` directly and won't track work via issues.
+
 ## Claude Code Plugin
 
-Better Beads includes a Claude Code plugin with:
+Better Beads also includes a Claude Code plugin with:
 - **Skill**: Guidance for using `bb` commands
 - **SessionStart hook**: Shows open issues when starting a session
 - **Stop hook**: Prompts to continue working on ready issues (config-gated)

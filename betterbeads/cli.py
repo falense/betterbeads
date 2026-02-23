@@ -3,6 +3,7 @@
 import functools
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 import click
@@ -1449,6 +1450,38 @@ def merge_log_cmd(base: str, ours: str, theirs: str, output_path: str) -> None:
         f.write(merged)
 
 
+BB_WORKFLOW_SECTION = """\
+
+## BetterBeads
+
+- Before starting ANY work, create or identify a GitHub issue using `bb`
+- Reference the issue number in all commits
+- Use `bb` for all GitHub operations, never `gh`
+"""
+
+BB_WORKFLOW_MARKER = "## BetterBeads"
+
+
+def _ensure_global_claude_md() -> bool:
+    """Add bb workflow instructions to ~/.claude/CLAUDE.md if not present.
+
+    Returns True if the section was added, False if already present.
+    """
+    claude_md = Path.home() / ".claude" / "CLAUDE.md"
+    claude_md.parent.mkdir(parents=True, exist_ok=True)
+
+    if claude_md.exists():
+        content = claude_md.read_text()
+        if BB_WORKFLOW_MARKER in content:
+            return False
+        claude_md.write_text(content.rstrip() + "\n" + BB_WORKFLOW_SECTION)
+    else:
+        claude_md.write_text(
+            "# Global Claude Code Rules\n" + BB_WORKFLOW_SECTION
+        )
+    return True
+
+
 @main.command("init")
 def init_cmd() -> None:
     """Initialize betterbeads in the current repository."""
@@ -1466,6 +1499,12 @@ def init_cmd() -> None:
     else:
         click.echo(f"Created {bb_dir}")
         click.echo("Warning: Could not configure merge driver", err=True)
+
+    # Add workflow instructions to global CLAUDE.md
+    if _ensure_global_claude_md():
+        click.echo("  - Added workflow instructions to ~/.claude/CLAUDE.md")
+    else:
+        click.echo("  - Workflow instructions already in ~/.claude/CLAUDE.md")
 
 
 # =============================================================================

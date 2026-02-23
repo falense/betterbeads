@@ -1,7 +1,7 @@
 {
   "name": "betterbeads",
   "description": "Better Beads (bb) - simplified GitHub operations for agents with complete context, dependency tracking, and undo capability",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": {
     "name": "agent-tools"
   }
