@@ -977,17 +977,6 @@ def issue_cmd(
             output_json(output)
             click.echo("\nRun with --execute (-x) to apply changes.", err=True)
 
-            # Log dry-run operation
-            op = history.create_operation(
-                target=target_repo,
-                type="issue",
-                num=number,
-                action="modify",
-                before=before,
-                after=after,
-                dry_run=True,
-            )
-            history.append_operation(op)
             return
 
         # Execute changes
@@ -1056,7 +1045,6 @@ def issue_cmd(
             action="modify",
             before=before,
             after=after,
-            dry_run=False,
         )
         history.append_operation(op)
 
@@ -1225,7 +1213,6 @@ def create_cmd(
                 "labels": labels_list,
                 "assignees": assignees_list,
             },
-            dry_run=False,
         )
         history.append_operation(op)
 
@@ -1273,7 +1260,6 @@ def history_cmd(
             "type": op.type,
             "number": op.num,
             "action": op.action,
-            "dry_run": op.dry_run,
         })
 
     output_json(output)
@@ -1318,7 +1304,7 @@ def undo_cmd(
         operations = history.read_history(since=commit_ts)
         # Filter out dry-runs and undo operations
         operations = [
-            op for op in operations if not op.dry_run and not op.action.startswith("undo:")
+            op for op in operations if not op.action.startswith("undo:")
         ]
         if not operations:
             click.echo(f"No operations to undo since last commit ({commit_ts})", err=True)
@@ -1327,8 +1313,7 @@ def undo_cmd(
     else:
         # Undo last N operations
         operations = history.read_history(limit=last)
-        # Filter out dry-runs
-        operations = [op for op in operations if not op.dry_run][:last]
+        operations = operations[:last]
 
     if not operations:
         click.echo("No operations to undo", err=True)
@@ -1407,7 +1392,6 @@ def undo_cmd(
                 action=f"undo:{op.id}",
                 before=op.after,
                 after=op.before,
-                dry_run=False,
             )
             history.append_operation(undo_op)
 
@@ -1727,16 +1711,6 @@ def pr_cmd(
             click.echo("\nRun with --execute (-x) to apply changes.", err=True)
 
             # Log dry-run operation
-            op = history.create_operation(
-                target=target_repo,
-                type="pr",
-                num=number,
-                action="modify",
-                before=before,
-                after=after,
-                dry_run=True,
-            )
-            history.append_operation(op)
             return
 
         # Execute changes
@@ -1805,7 +1779,6 @@ def pr_cmd(
             action="modify",
             before=before,
             after=after,
-            dry_run=False,
         )
         history.append_operation(op)
 
@@ -1982,7 +1955,6 @@ def pr_create_cmd(
                 "assignees": assignees_list,
                 "reviewers": reviewers_list,
             },
-            dry_run=False,
         )
         history.append_operation(op)
 
@@ -2136,16 +2108,6 @@ def next_cmd(
             click.echo("\nRun with --execute (-x) to start working on this issue.", err=True)
 
             # Log dry-run
-            op = history.create_operation(
-                target=target_repo,
-                type="issue",
-                num=selected.number,
-                action="next",
-                before=before,
-                after=after,
-                dry_run=True,
-            )
-            history.append_operation(op)
             return
 
         # Execute changes
@@ -2176,7 +2138,6 @@ def next_cmd(
             action="next",
             before=before,
             after=after,
-            dry_run=False,
         )
         history.append_operation(op)
 

@@ -325,7 +325,6 @@ class Operation:
     action: str
     before: dict[str, Any]
     after: dict[str, Any]
-    dry_run: bool = False
 
     def to_json_line(self) -> str:
         """Convert to single-line JSON for log."""
@@ -341,7 +340,6 @@ class Operation:
                 "action": self.action,
                 "before": self.before,
                 "after": self.after,
-                "dry_run": self.dry_run,
             },
             separators=(",", ":"),
         )
@@ -361,5 +359,4 @@ class Operation:
             action=data["action"],
             before=data["before"],
             after=data["after"],
-            dry_run=data.get("dry_run", False),
         )

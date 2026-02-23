@@ -207,7 +207,6 @@ def create_operation(
     action: str,
     before: dict[str, Any],
     after: dict[str, Any],
-    dry_run: bool = False,
 ) -> Operation:
     """Create a new operation record."""
     return Operation(
@@ -219,7 +218,6 @@ def create_operation(
         action=action,
         before=before,
         after=after,
-        dry_run=dry_run,
     )
 
 
