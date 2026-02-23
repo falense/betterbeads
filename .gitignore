@@ -2,6 +2,8 @@
 .transcripts/
 .memories/
 .tmp/
+.betterbeads/
+.ght/
 
 # Python
 __pycache__/
